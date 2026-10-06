@@ -9,35 +9,43 @@ const seedData = async () => {
     await mongoose.connect(process.env.MONGODB_URI);
     console.log("Connected to MongoDB for seeding...");
 
-    // Clear old sample data if any
-    await User.deleteMany({});
+    // Ensure default users exist without deleting other users
+    let admin = await User.findOne({ email: "admin@ticketbari.com" });
+    if (!admin) {
+      admin = await User.create({
+        name: "System Admin",
+        email: "admin@ticketbari.com",
+        password: "admin123",
+        role: "admin",
+        image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
+      });
+    }
+
+    let vendor1 = await User.findOne({ email: "vendor@ticketbari.com" });
+    if (!vendor1) {
+      vendor1 = await User.create({
+        name: "Green Line Paribahan",
+        email: "vendor@ticketbari.com",
+        password: "vendor123",
+        role: "vendor",
+        image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
+      });
+    }
+
+    let user1 = await User.findOne({ email: "user@ticketbari.com" });
+    if (!user1) {
+      user1 = await User.create({
+        name: "Tanvir Ahmed",
+        email: "user@ticketbari.com",
+        password: "user123",
+        role: "user",
+        image: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100&h=100&fit=crop",
+      });
+    }
+
+    // Reset tickets & bookings with fresh sample data
     await Ticket.deleteMany({});
     await Booking.deleteMany({});
-
-    // 1. Create Default Users
-    const admin = await User.create({
-      name: "System Admin",
-      email: "admin@ticketbari.com",
-      password: "admin123",
-      role: "admin",
-      image: "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=100&h=100&fit=crop",
-    });
-
-    const vendor1 = await User.create({
-      name: "Green Line Paribahan",
-      email: "vendor@ticketbari.com",
-      password: "vendor123",
-      role: "vendor",
-      image: "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=100&h=100&fit=crop",
-    });
-
-    const user1 = await User.create({
-      name: "Tanvir Ahmed",
-      email: "user@ticketbari.com",
-      password: "user123",
-      role: "user",
-      image: "https://images.unsplash.com/photo-1492562080023-ab3db95bfbce?w=100&h=100&fit=crop",
-    });
 
     // 2. Create Initial Tickets
     const tickets = await Ticket.create([
@@ -124,7 +132,7 @@ const seedData = async () => {
         vendorEmail: vendor1.email,
         vendorName: vendor1.name,
         verificationStatus: "approved",
-        isAdvertised: false,
+        isAdvertised: true,
       },
       {
         title: "Chittagong to Cox's Bazar Coastal Express",
@@ -136,7 +144,7 @@ const seedData = async () => {
         quantity: 150,
         description: "Newly inaugurated coastal train journey straight to Cox's Bazar iconic oyster station.",
         perks: ["AC", "Large Windows", "Comfortable Seating"],
-        image: "https://images.unsplash.com/photo-1517649763962-0c623266ddc0?w=600&h=400&fit=crop",
+        image: "https://images.unsplash.com/photo-1721222339587-41f46a42fb11?q=80&w=800&auto=format&fit=crop",
         vendorId: vendor1._id,
         vendorEmail: vendor1.email,
         vendorName: vendor1.name,
@@ -153,11 +161,28 @@ const seedData = async () => {
         quantity: 90,
         description: "Regular intercity express traversing the Jamuna Multipurpose Bridge.",
         perks: ["Snack Service", "Air Conditioned"],
-        image: "https://images.unsplash.com/photo-1565793279042-ab0ddf5a57f0?w=600&h=400&fit=crop",
+        image: "https://images.unsplash.com/photo-1568514328861-5465017e40fc?q=80&w=800&auto=format&fit=crop",
         vendorId: vendor1._id,
         vendorEmail: vendor1.email,
         vendorName: vendor1.name,
-        verificationStatus: "pending",
+        verificationStatus: "approved",
+        isAdvertised: false,
+      },
+      {
+        title: "Dhaka to Jessore Novoair Direct",
+        from: "Dhaka",
+        to: "Jessore",
+        transportType: "plane",
+        price: 2800,
+        departureDate: new Date("2026-12-08T11:00:00Z"),
+        quantity: 45,
+        description: "Fast morning domestic flight connecting Dhaka to south-western industrial hubs.",
+        perks: ["Snacks", "Quick Check-in"],
+        image: "https://images.unsplash.com/photo-1529074963764-98f45c47344b?w=600&h=400&fit=crop",
+        vendorId: vendor1._id,
+        vendorEmail: vendor1.email,
+        vendorName: vendor1.name,
+        verificationStatus: "approved",
         isAdvertised: false,
       },
     ]);

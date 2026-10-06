@@ -55,6 +55,49 @@ router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   }
 });
 
+// Vendor Toggle Own Ticket Advertisement
+router.patch("/advertise/:id", verifyToken, verifyVendor, async (req, res) => {
+  try {
+    const { isAdvertised } = req.body;
+    const ticket = await Ticket.findById(req.params.id);
+
+    if (!ticket) {
+      return res.status(404).json({ message: "Ticket not found" });
+    }
+
+    // Vendors can only advertise their own tickets; admins can advertise any
+    if (req.user.role !== "admin" && ticket.vendorEmail !== req.user.email) {
+      return res.status(403).json({ message: "You can only advertise your own tickets" });
+    }
+
+    if (isAdvertised) {
+      if (ticket.verificationStatus !== "approved") {
+        return res.status(400).json({ message: "Only approved tickets can be advertised" });
+      }
+
+      const currentAdvCount = await Ticket.countDocuments({
+        isAdvertised: true,
+        verificationStatus: "approved",
+      });
+
+      if (currentAdvCount >= 6) {
+        return res.status(400).json({ message: "Maximum 6 tickets can be advertised simultaneously" });
+      }
+    }
+
+    ticket.isAdvertised = Boolean(isAdvertised);
+    await ticket.save();
+
+    return res.json({
+      message: ticket.isAdvertised ? "Ticket advertised on homepage" : "Ticket removed from ads",
+      ticket,
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update advertisement status", error: error.message });
+  }
+});
+
+
 // Get All Approved Tickets with Filtering, Search, Sort & Pagination
 router.get("/", async (req, res) => {
   try {
