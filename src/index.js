@@ -63,8 +63,12 @@ app.use((err, req, res, next) => {
   });
 });
 
-// Start Server
-app.listen(PORT, () => {
-  console.log(`🚀 TicketBari Server running on port ${PORT}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/`);
-});
+// Start Server (only in local dev, not on Vercel)
+if (process.env.NODE_ENV !== "production") {
+  app.listen(PORT, () => {
+    console.log(`🚀 TicketBari Server running on port ${PORT}`);
+    console.log(`🌐 Health check: http://localhost:${PORT}/`);
+  });
+}
+
+module.exports = app;
