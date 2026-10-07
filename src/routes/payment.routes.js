@@ -207,13 +207,17 @@ async function getTransactionsForUser(user) {
 
   // Add payments first
   for (const p of payments) {
-    const key = p.transactionId || p._id.toString();
+    const bookingIdStr = p.bookingId?._id?.toString() || p.bookingId?.toString() || "";
+    const primaryKey = bookingIdStr || p.transactionId || p._id.toString();
+
     const title =
       p.bookingId?.ticketId?.title ||
       p.bookingId?.title ||
       "Ticket Booking";
-    map.set(key, {
+
+    map.set(primaryKey, {
       _id: p._id.toString(),
+      bookingId: bookingIdStr,
       transactionId: p.transactionId || `pi_${p._id}`,
       ticketTitle: title,
       amount: p.amount,
@@ -226,10 +230,13 @@ async function getTransactionsForUser(user) {
 
   // Add any paid bookings that might not have a separate Payment entry
   for (const b of paidBookings) {
-    const txId = b.transactionId || `pi_${b._id.toString().substring(0, 10)}`;
-    if (!map.has(txId)) {
-      map.set(txId, {
+    const bookingIdStr = b._id.toString();
+    const txId = b.transactionId || `pi_${bookingIdStr.substring(0, 10)}`;
+
+    if (!map.has(bookingIdStr) && !map.has(txId)) {
+      map.set(bookingIdStr, {
         _id: b._id.toString(),
+        bookingId: bookingIdStr,
         transactionId: txId,
         ticketTitle: b.ticketId?.title || "Ticket Booking",
         amount: b.totalPrice,
