@@ -33,7 +33,7 @@ router.post("/pay-instant", verifyToken, async (req, res) => {
     if (!payment) {
       payment = await Payment.create({
         bookingId: booking._id,
-        userId: booking.userId || (req.user && req.user.id) || null,
+        userId: booking.userId || (req.user && req.user.id) || undefined,
         userEmail: booking.userEmail || req.user.email,
         amount: booking.totalPrice,
         currency: "bdt",
@@ -114,7 +114,7 @@ router.post("/create-checkout", verifyToken, async (req, res) => {
 
       await Payment.create({
         bookingId: booking._id,
-        userId: booking.userId,
+        userId: booking.userId || undefined,
         userEmail: booking.userEmail,
         amount: booking.totalPrice,
         currency: "bdt",
@@ -149,7 +149,7 @@ router.post("/confirm", verifyToken, async (req, res) => {
 
     await Payment.create({
       bookingId: booking._id,
-      userId: booking.userId,
+      userId: booking.userId || undefined,
       userEmail: booking.userEmail,
       amount: booking.totalPrice,
       currency: "bdt",

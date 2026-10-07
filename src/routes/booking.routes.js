@@ -26,9 +26,12 @@ router.post("/", verifyToken, async (req, res) => {
 
     const totalPrice = ticket.price * qty;
 
+    // Safely handle userId — mock_token users and Google OAuth users may have null id
+    const userIdValue = req.user.id && req.user.id !== "dev-user-id" ? req.user.id : undefined;
+
     const booking = await Booking.create({
       ticketId: ticket._id,
-      userId: req.user.id !== "dev-user-id" ? req.user.id : undefined,
+      userId: userIdValue,
       userEmail: req.user.email,
       userName: req.user.name || "Customer",
       vendorId: ticket.vendorId,
