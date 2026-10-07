@@ -144,9 +144,13 @@ router.get("/", async (req, res) => {
 
     // Sort order
     let sortOption = { createdAt: -1 };
-    if (sort === "price-asc") sortOption = { price: 1 };
-    else if (sort === "price-desc") sortOption = { price: -1 };
-    else if (sort === "date-asc") sortOption = { departureDate: 1 };
+    if (sort === "price-asc" || sort === "asc" || sort === "low-to-high") {
+      sortOption = { price: 1 };
+    } else if (sort === "price-desc" || sort === "desc" || sort === "high-to-low") {
+      sortOption = { price: -1 };
+    } else if (sort === "date-asc") {
+      sortOption = { departureDate: 1 };
+    }
 
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
