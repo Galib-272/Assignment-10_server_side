@@ -27,6 +27,7 @@ const verifyToken = async (req, res, next) => {
             id: null, // not a valid ObjectId — routes must handle this
             email,
             name: req.headers["x-user-name"] || "",
+            image: req.headers["x-user-image"] || "",
             role: roleHeader,
           };
           return next();
@@ -35,12 +36,13 @@ const verifyToken = async (req, res, next) => {
         // Lookup user in DB if email present
         if (email) {
           try {
-            const dbUser = await User.findOne({ email }).select("role name email _id");
+            const dbUser = await User.findOne({ email }).select("role name email image _id");
             if (dbUser) {
               req.user = {
                 id: dbUser._id.toString(),
                 email: dbUser.email,
                 name: dbUser.name,
+                image: dbUser.image || req.headers["x-user-image"] || "",
                 role: roleHeader && ["admin", "vendor", "user"].includes(roleHeader) ? roleHeader : dbUser.role,
               };
               return next();

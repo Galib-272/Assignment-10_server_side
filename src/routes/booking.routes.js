@@ -1,6 +1,7 @@
 const express = require("express");
 const Booking = require("../models/Booking");
 const Ticket = require("../models/Ticket");
+const User = require("../models/User");
 const { verifyToken, verifyVendor } = require("../middlewares/auth");
 
 const router = express.Router();
@@ -8,7 +9,7 @@ const router = express.Router();
 // Customer Book Ticket
 router.post("/", verifyToken, async (req, res) => {
   try {
-    const { ticketId, quantity } = req.body;
+    const { ticketId, quantity, userImage: reqImage } = req.body;
     const qty = Number(quantity) || 1;
 
     if (!ticketId) {
@@ -28,12 +29,14 @@ router.post("/", verifyToken, async (req, res) => {
 
     // Safely handle userId — mock_token users and Google OAuth users may have null id
     const userIdValue = req.user.id && req.user.id !== "dev-user-id" ? req.user.id : undefined;
+    const userImage = reqImage || (req.user && req.user.image) || "";
 
     const booking = await Booking.create({
       ticketId: ticket._id,
       userId: userIdValue,
       userEmail: req.user.email,
       userName: req.user.name || "Customer",
+      userImage: userImage,
       vendorId: ticket.vendorId,
       quantity: qty,
       totalPrice,
@@ -77,9 +80,35 @@ router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
 
     const bookings = await Booking.find({ ticketId: { $in: ticketIds } })
       .populate("ticketId")
-      .sort({ createdAt: -1 });
+      .populate("userId", "name email image")
+      .sort({ createdAt: -1 })
+      .lean();
 
-    return res.json(bookings);
+    // Enrich with user information (name, email, image) from User collection
+    const userEmails = [...new Set(bookings.map((b) => b.userEmail).filter(Boolean))];
+    const users = await User.find({ email: { $in: userEmails } }).select("name email image").lean();
+    const userMap = new Map(users.map((u) => [u.email, u]));
+
+    const enrichedBookings = bookings.map((b) => {
+      const u = (b.userEmail && userMap.get(b.userEmail)) || (b.userId && typeof b.userId === "object" ? b.userId : {}) || {};
+      const finalName = b.userName || u.name || (b.userId && b.userId.name) || "Customer";
+      const finalEmail = b.userEmail || u.email || (b.userId && b.userId.email) || "";
+      const finalImage = b.userImage || u.image || (b.userId && b.userId.image) || "";
+      return {
+        ...b,
+        userName: finalName,
+        userEmail: finalEmail,
+        userImage: finalImage,
+        userId: {
+          _id: b.userId?._id || b.userId || u._id,
+          name: finalName,
+          email: finalEmail,
+          image: finalImage,
+        },
+      };
+    });
+
+    return res.json(enrichedBookings);
   } catch (error) {
     return res.status(500).json({ message: "Failed to fetch vendor bookings", error: error.message });
   }

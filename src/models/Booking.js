@@ -20,6 +20,10 @@ const bookingSchema = new mongoose.Schema(
       type: String,
       default: "Customer",
     },
+    userImage: {
+      type: String,
+      default: "",
+    },
     vendorId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
