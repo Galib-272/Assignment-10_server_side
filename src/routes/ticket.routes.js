@@ -20,12 +20,37 @@ router.get("/advertised", async (req, res) => {
   }
 });
 
-// Get Latest Tickets (Homepage - 6 cards)
+const mongoose = require("mongoose");
+const User = require("../models/User");
+const { findMockTicket, mockTicketsList } = require("../config/mockCatalogue");
+
+// Get Latest Tickets (Homepage - 8 cards)
 router.get("/latest", async (req, res) => {
   try {
-    const tickets = await Ticket.find({ verificationStatus: "approved" })
+    let tickets = await Ticket.find({ verificationStatus: "approved" })
       .sort({ createdAt: -1 })
-      .limit(6);
+      .limit(8);
+
+    // If fewer than 6 tickets in DB, seed mock tickets into DB so they have real ObjectIds
+    if (tickets.length < 6) {
+      const defaultVendor = await User.findOne({ role: "vendor" });
+      for (const m of mockTicketsList) {
+        const exists = await Ticket.findOne({ title: m.title });
+        if (!exists) {
+          await Ticket.create({
+            ...m,
+            vendorId: defaultVendor?._id || undefined,
+            vendorEmail: defaultVendor?.email || "vendor@ticketbari.com",
+            vendorName: defaultVendor?.name || "Green Line Paribahan",
+            verificationStatus: "approved",
+            departureDate: new Date(Date.now() + 7 * 86400000),
+          });
+        }
+      }
+      tickets = await Ticket.find({ verificationStatus: "approved" })
+        .sort({ createdAt: -1 })
+        .limit(8);
+    }
 
     return res.json(tickets);
   } catch (error) {
@@ -176,7 +201,27 @@ router.get("/", async (req, res) => {
 // Get Single Ticket by ID
 router.get("/:id", async (req, res) => {
   try {
-    const ticket = await Ticket.findById(req.params.id);
+    let ticket = null;
+    if (mongoose.isValidObjectId(req.params.id)) {
+      ticket = await Ticket.findById(req.params.id);
+    }
+    if (!ticket) {
+      const mock = findMockTicket(req.params.id);
+      if (mock) {
+        ticket = await Ticket.findOne({ title: mock.title });
+        if (!ticket) {
+          const defaultVendor = await User.findOne({ role: "vendor" });
+          ticket = await Ticket.create({
+            ...mock,
+            vendorId: defaultVendor?._id || undefined,
+            vendorEmail: defaultVendor?.email || "vendor@ticketbari.com",
+            vendorName: defaultVendor?.name || "Green Line Paribahan",
+            verificationStatus: "approved",
+            departureDate: new Date(Date.now() + 7 * 86400000),
+          });
+        }
+      }
+    }
     if (!ticket) {
       return res.status(404).json({ message: "Ticket not found" });
     }
