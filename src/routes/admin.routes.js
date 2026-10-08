@@ -133,4 +133,46 @@ router.patch("/users/:id/role", async (req, res) => {
   }
 });
 
+// Toggle Mark as Fraud (Vendor only)
+router.patch("/users/:id/fraud", async (req, res) => {
+  try {
+    const { isFraud } = req.body;
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({ message: "User not found" });
+    }
+
+    if (user.role !== "vendor") {
+      return res.status(400).json({ message: "Fraud flag can only be applied to vendors" });
+    }
+
+    user.isFraud = Boolean(isFraud);
+    await user.save();
+
+    // If marking as fraud, hide all of their tickets by setting verificationStatus to "rejected"
+    if (user.isFraud) {
+      await Ticket.updateMany(
+        { vendorEmail: user.email },
+        { $set: { verificationStatus: "rejected", isAdvertised: false } }
+      );
+    }
+
+    return res.json({
+      message: user.isFraud
+        ? `${user.name} has been marked as fraud. All their tickets have been hidden.`
+        : `Fraud flag removed from ${user.name}.`,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        isFraud: user.isFraud,
+      },
+    });
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to update fraud status", error: error.message });
+  }
+});
+
 module.exports = router;

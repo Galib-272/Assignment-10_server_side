@@ -1,5 +1,6 @@
 const express = require("express");
 const Ticket = require("../models/Ticket");
+const User = require("../models/User");
 const { verifyToken, verifyVendor } = require("../middlewares/auth");
 
 const router = express.Router();
@@ -189,6 +190,12 @@ router.get("/:id", async (req, res) => {
 // Vendor Create Ticket
 router.post("/", verifyToken, verifyVendor, async (req, res) => {
   try {
+    // Check if vendor is marked as fraud
+    const vendorUser = await User.findOne({ email: req.user.email });
+    if (vendorUser && vendorUser.isFraud) {
+      return res.status(403).json({ message: "Your account has been flagged as fraud. You cannot add new tickets." });
+    }
+
     const {
       title,
       from,
@@ -249,6 +256,14 @@ router.patch("/:id", verifyToken, verifyVendor, async (req, res) => {
     // Ensure only the owner vendor or admin can update
     if (ticket.vendorEmail !== req.user.email && req.user.role !== "admin") {
       return res.status(403).json({ message: "Unauthorized to edit this ticket" });
+    }
+
+    // Block fraud vendors from editing (admins are exempt)
+    if (req.user.role !== "admin") {
+      const vendorUser = await User.findOne({ email: req.user.email });
+      if (vendorUser && vendorUser.isFraud) {
+        return res.status(403).json({ message: "Your account has been flagged as fraud. You cannot modify tickets." });
+      }
     }
 
     const allowedUpdates = [

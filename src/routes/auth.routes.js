@@ -130,9 +130,16 @@ router.get("/me", verifyToken, async (req, res) => {
   try {
     const user = await User.findById(req.user.id).select("-password");
     if (!user) {
-      return res.json({ user: req.user });
+      return res.json({ ...req.user, isFraud: false });
     }
-    return res.json({ user });
+    return res.json({
+      id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      image: user.image,
+      isFraud: user.isFraud || false,
+    });
   } catch (error) {
     return res.status(500).json({ message: "Error fetching profile", error: error.message });
   }

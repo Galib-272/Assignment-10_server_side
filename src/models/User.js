@@ -28,6 +28,10 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    isFraud: {
+      type: Boolean,
+      default: false,
+    },
   },
   {
     timestamps: true,
