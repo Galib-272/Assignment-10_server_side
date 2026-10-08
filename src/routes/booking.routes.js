@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const Booking = require("../models/Booking");
 const Ticket = require("../models/Ticket");
 const User = require("../models/User");
@@ -70,29 +71,24 @@ router.get("/my", verifyToken, async (req, res) => {
   }
 });
 
-// View Single Booking by ID
-router.get("/:id", verifyToken, async (req, res) => {
-  try {
-    const booking = await Booking.findById(req.params.id).populate("ticketId");
-    if (!booking) {
-      return res.status(404).json({ message: "Booking not found" });
-    }
-    // Allow owner, vendor of ticket, or admin
-    return res.json(booking);
-  } catch (error) {
-    return res.status(500).json({ message: "Failed to fetch booking", error: error.message });
-  }
-});
-
-// Vendor View Requested Bookings
+// Vendor View Requested Bookings (MUST be before /:id)
 router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   try {
     const vendorEmail = req.user.email;
     // Find all tickets belonging to this vendor
-    const vendorTickets = await Ticket.find({ vendorEmail }).select("_id");
+    const vendorTickets = await Ticket.find({
+      vendorEmail: { $regex: new RegExp(`^${vendorEmail}$`, "i") },
+    }).select("_id");
     const ticketIds = vendorTickets.map((t) => t._id);
 
-    const bookings = await Booking.find({ ticketId: { $in: ticketIds } })
+    const bookings = await Booking.find({
+      $or: [
+        { ticketId: { $in: ticketIds } },
+        ...(req.user.id && req.user.id !== "dev-user-id" && mongoose.Types.ObjectId.isValid(req.user.id)
+          ? [{ vendorId: req.user.id }]
+          : []),
+      ],
+    })
       .populate("ticketId")
       .populate("userId", "name email image")
       .sort({ createdAt: -1 })
@@ -128,6 +124,23 @@ router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   }
 });
 
+// View Single Booking by ID (AFTER /vendor and /my)
+router.get("/:id", verifyToken, async (req, res) => {
+  try {
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid booking ID" });
+    }
+    const booking = await Booking.findById(req.params.id).populate("ticketId");
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    // Allow owner, vendor of ticket, or admin
+    return res.json(booking);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to fetch booking", error: error.message });
+  }
+});
+
 // Vendor Accept or Reject Booking
 router.patch("/:id/status", verifyToken, verifyVendor, async (req, res) => {
   try {
@@ -136,24 +149,40 @@ router.patch("/:id/status", verifyToken, verifyVendor, async (req, res) => {
       return res.status(400).json({ message: "Invalid status: must be accepted or rejected" });
     }
 
+    if (!mongoose.Types.ObjectId.isValid(req.params.id)) {
+      return res.status(400).json({ message: "Invalid booking ID" });
+    }
+
     const booking = await Booking.findById(req.params.id).populate("ticketId");
     if (!booking) {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Ensure status is currently pending
-    if (booking.status !== "pending") {
-      return res.status(400).json({ message: `Cannot change status of a booking that is already ${booking.status}` });
+    // If booking is already paid, do not allow changing status
+    if (booking.status === "paid") {
+      return res.status(400).json({ message: "Cannot change status of a booking that is already paid" });
     }
 
+    const oldStatus = booking.status;
     booking.status = status;
     await booking.save();
 
-    // If rejected, refund the reserved seats back to ticket quantity
-    if (status === "rejected" && booking.ticketId) {
-      const ticket = await Ticket.findById(booking.ticketId._id);
+    // If changing to rejected from non-rejected, restore seats back to ticket
+    if (status === "rejected" && oldStatus !== "rejected" && booking.ticketId) {
+      const ticketId = booking.ticketId._id || booking.ticketId;
+      const ticket = await Ticket.findById(ticketId);
       if (ticket) {
         ticket.quantity += booking.quantity;
+        await ticket.save();
+      }
+    }
+
+    // If changing from rejected back to accepted, reserve seats if available
+    if (status === "accepted" && oldStatus === "rejected" && booking.ticketId) {
+      const ticketId = booking.ticketId._id || booking.ticketId;
+      const ticket = await Ticket.findById(ticketId);
+      if (ticket && ticket.quantity >= booking.quantity) {
+        ticket.quantity -= booking.quantity;
         await ticket.save();
       }
     }
