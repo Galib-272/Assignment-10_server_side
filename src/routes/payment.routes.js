@@ -10,7 +10,7 @@ const router = express.Router();
 // 1. Instant Pay (mark as paid directly with toast, without external redirect)
 router.post("/pay-instant", verifyToken, async (req, res) => {
   try {
-    const { bookingId } = req.body;
+    const { bookingId, transactionId, paymentMethod } = req.body;
     if (!bookingId) {
       return res.status(400).json({ message: "Booking ID is required" });
     }
@@ -20,9 +20,10 @@ router.post("/pay-instant", verifyToken, async (req, res) => {
       return res.status(404).json({ message: "Booking not found" });
     }
 
-    // Generate unique transaction ID
+    // Generate unique transaction ID if not provided
     const randomSuffix = Math.random().toString(36).substring(2, 8).toUpperCase();
-    const txId = `pi_${Date.now().toString(36).toUpperCase()}${randomSuffix}`;
+    const txId = transactionId || `pi_${Date.now().toString(36).toUpperCase()}${randomSuffix}`;
+    const method = paymentMethod || "stripe";
 
     booking.status = "paid";
     booking.transactionId = txId;
@@ -38,12 +39,13 @@ router.post("/pay-instant", verifyToken, async (req, res) => {
         amount: booking.totalPrice,
         currency: "bdt",
         transactionId: txId,
-        paymentMethod: "instant_pay",
+        paymentMethod: method,
         status: "succeeded",
       });
     } else {
       payment.status = "succeeded";
       payment.transactionId = txId;
+      payment.paymentMethod = method;
       await payment.save();
     }
 
@@ -224,7 +226,7 @@ async function getTransactionsForUser(user) {
       date: p.createdAt,
       userEmail: p.userEmail,
       status: p.status || "succeeded",
-      paymentMethod: p.paymentMethod || "instant_pay",
+      paymentMethod: p.paymentMethod || "stripe",
     });
   }
 
@@ -243,7 +245,7 @@ async function getTransactionsForUser(user) {
         date: b.updatedAt || b.createdAt,
         userEmail: b.userEmail,
         status: "succeeded",
-        paymentMethod: "instant_pay",
+        paymentMethod: "stripe",
       });
     }
   }

@@ -70,6 +70,20 @@ router.get("/my", verifyToken, async (req, res) => {
   }
 });
 
+// View Single Booking by ID
+router.get("/:id", verifyToken, async (req, res) => {
+  try {
+    const booking = await Booking.findById(req.params.id).populate("ticketId");
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
+    }
+    // Allow owner, vendor of ticket, or admin
+    return res.json(booking);
+  } catch (error) {
+    return res.status(500).json({ message: "Failed to fetch booking", error: error.message });
+  }
+});
+
 // Vendor View Requested Bookings
 router.get("/vendor", verifyToken, verifyVendor, async (req, res) => {
   try {
